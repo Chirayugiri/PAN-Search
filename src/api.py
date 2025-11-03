@@ -164,5 +164,7 @@ def search(
 					item["pan_hit_snippet_html"] = p_hit_html
 			data.append(item)
 		return {"count": len(rows), "data": data}
+
 	finally:
+     
 		con.close()
