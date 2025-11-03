@@ -16,9 +16,9 @@ class Columns:
 @dataclass(frozen=True)
 class Thresholds:
 	# Name fuzzy matching
-	name_strict: int = 92   # exact/near-exact
-	name_medium: int = 85   # common small variants
-	name_loose: int = 78    # cross-script/transliteration variants
+	name_strict: int = 90   # exact/near-exact
+	name_medium: int = 82   # common small variants (reduced)
+	name_loose: int = 75    # cross-script/transliteration variants (reduced)
 
 	# Attribute verification
 	address_loose: int = 72

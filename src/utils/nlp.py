@@ -1,6 +1,6 @@
 import re
 import unicodedata
-from typing import Iterable, List, Optional, Tuple
+from typing import Iterable, List, Optional, Tuple, Dict, Set
 
 import phonetics
 from rapidfuzz import fuzz
@@ -124,3 +124,69 @@ def extract_names_from_blob(blob: Optional[str]) -> List[str]:
 			seen.add(c)
 			uniq.append(c)
 	return uniq[:3]
+
+
+# ------------------ Name Variation Utilities ------------------
+def _generate_english_spelling_variations(name: str, rules: Dict[str, List[str]]) -> Set[str]:
+	if not name:
+		return {""}
+	char = name[0]
+	rest = name[1:]
+	variations_of_rest = _generate_english_spelling_variations(rest, rules)
+	current: Set[str] = set()
+	subs = rules.get(char, [char])
+	for sub in subs:
+		for v in variations_of_rest:
+			current.add(sub + v)
+	return current
+
+
+def generate_all_name_variations(input_name: str) -> Dict[str, Set[str]]:
+	"""
+	Generate English/Marathi name variations via transliteration + simple spelling rules.
+	Returns { 'marathi': set[str], 'english': set[str] }.
+	"""
+	base_english = ""
+	base_devanagari = ""
+	if is_devanagari(input_name):
+		base_devanagari = input_name
+		base_english = transliterate(input_name, sanscript.DEVANAGARI, sanscript.ITRANS)
+	else:
+		base_english = (input_name or "").lower()
+		try:
+			base_devanagari = transliterate(base_english, sanscript.ITRANS, sanscript.DEVANAGARI)
+		except Exception:
+			temp = base_english.replace("i", "ee").replace("oo", "U")
+			base_devanagari = transliterate(temp, sanscript.ITRANS, sanscript.DEVANAGARI)
+
+	marathi_variations: Set[str] = {base_devanagari}
+	rules_marathi = {
+		"ी": "ि",
+		"ि": "ी",
+		"ू": "ु",
+		"ु": "ू",
+		"श": "स",
+		"स": "श",
+	}
+	for _ in range(2):
+		temp_set: Set[str] = set()
+		for nm in list(marathi_variations):
+			for ch, rep in rules_marathi.items():
+				if ch in nm:
+					temp_set.add(nm.replace(ch, rep, 1))
+		marathi_variations.update(temp_set)
+
+	english_variations: Set[str] = set()
+	for nm in marathi_variations:
+		english_variations.add(transliterate(nm, sanscript.DEVANAGARI, sanscript.ITRANS))
+
+	rules_english = {
+		"a": ["a", "aa"],
+		"i": ["i", "ee"],
+		"u": ["u", "oo"],
+		"v": ["v", "w"],
+		"j": ["j", "z"],
+	}
+	english_variations.update(_generate_english_spelling_variations(base_english, rules_english))
+
+	return {"marathi": marathi_variations, "english": english_variations}

@@ -18,11 +18,13 @@ def main(parquet_dir: str, db_path: str) -> None:
 	# Lightweight indexes
 	con.execute("CREATE INDEX IF NOT EXISTS idx_pan ON transactions(pan_upper)")
 	con.execute("CREATE INDEX IF NOT EXISTS idx_name_phonetic ON transactions(name_phonetic)")
+ 
 	con.close()
 
 
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser()
+ 
 	parser.add_argument("--parquet", required=True, help="Directory containing parquet files")
 	parser.add_argument("--db", required=True, help="DuckDB file path to create")
 	args = parser.parse_args()

@@ -15,6 +15,7 @@
 			--danger: #ff6b6b;
 			--border: #1f2a37;
 		}
+		mark { background: #ffeb3b; color: #111; padding: 0 .15em; border-radius: 2px; }
 		* { box-sizing: border-box; }
 		html, body { height: 100%; }
 		body { margin: 0; background: linear-gradient(180deg, #0b0f14, #0a0d12); color: var(--text); font-family: "Inter", system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
@@ -118,6 +119,23 @@
 	function setStatus(msg){ el('stat').textContent = msg; }
 	function setLoading(on){ el('loading').style.display = on ? 'block':'none'; el('table').style.display = on ? 'none':'table'; el('pager').style.display = on ? 'none':'flex'; }
 
+	async function fetchPhonetics(){
+		const seed = el('seed').value.trim();
+		if (!seed){ showToast('Enter a name'); return; }
+		try {
+			const res = await fetch(`${API_BASE}/phonetics?` + new URLSearchParams({seed_name: seed}));
+			if (!res.ok) throw new Error(await res.text());
+			const json = await res.json();
+			const chips = el('chips'); chips.innerHTML = '';
+			const makeChip = (text) => { const b = document.createElement('button'); b.className='btn'; b.style.padding='6px 10px'; b.textContent = text; b.onclick=()=>{ el('seed').value = text; }; return b; };
+			const eng = Array.from(json.variations?.english || []).slice(0, 12);
+			const dev = Array.from(json.variations?.marathi || []).slice(0, 12);
+			for (const v of eng) chips.appendChild(makeChip(v));
+			for (const v of dev) chips.appendChild(makeChip(v));
+			showToast('Phonetic suggestions updated');
+		} catch(e){ console.error(e); showToast('Phonetics failed'); }
+	}
+
 	async function fetchSearch(){
 		const pan = el('pan').value.trim();
 		const seed = el('seed').value.trim();
@@ -132,7 +150,9 @@
 			if (!res.ok) throw new Error(await res.text());
 			const json = await res.json();
 			state.rows = json.data || [];
-			state.cols = state.rows.length ? Object.keys(state.rows[0]) : [];
+			// Build visible columns but hide helper highlight fields
+			const allCols = state.rows.length ? Object.keys(state.rows[0]) : [];
+			state.cols = allCols.filter(c => !['name_hit_field','name_hit_snippet','name_hit_snippet_html','pan_hit_field','pan_hit_snippet_html'].includes(c));
 			state.page = 1;
 			render();
 			setStatus(`Found ${state.rows.length.toLocaleString()} rows`);
@@ -163,7 +183,19 @@
 		const pageRows = paginate(state.rows, state.page, state.pageSize);
 		for (const r of pageRows){
 			const tr = document.createElement('tr');
-			for (const c of state.cols){ const td = document.createElement('td'); const v = r[c]; td.textContent = (v!==null && v!==undefined) ? String(v).slice(0, 500) : ''; tr.appendChild(td); }
+			for (const c of state.cols){
+				const td = document.createElement('td');
+				const v = r[c];
+				// If this column is the hit field, render the HTML snippet with <mark>
+				if (r.name_hit_field === c && r.name_hit_snippet_html){
+					td.innerHTML = String(r.name_hit_snippet_html);
+				} else if (r.pan_hit_field === c && r.pan_hit_snippet_html){
+					td.innerHTML = String(r.pan_hit_snippet_html);
+				} else {
+					td.textContent = (v!==null && v!==undefined) ? String(v).slice(0, 500) : '';
+				}
+				tr.appendChild(td);
+			}
 			tbody.appendChild(tr);
 		}
 		table.appendChild(tbody);
@@ -187,6 +219,7 @@
 	function safeCsv(v){ if (v===null||v===undefined) return ''; const s = String(v).replace(/"/g,'""'); return /[",\n]/.test(s) ? `"${s}"` : s; }
 
 	el('btnSearch').onclick = fetchSearch;
+	el('btnPhonetics').onclick = fetchPhonetics;
 	el('btnClear').onclick = () => { el('pan').value=''; el('seed').value=''; setStatus('Ready'); };
 	el('btnExport').onclick = exportCSV;
 	el('prev').onclick = ()=>{ if (state.page>1){ state.page--; render(); }};
